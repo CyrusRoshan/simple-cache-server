@@ -1,0 +1,12 @@
+# Address of the backing Redis
+redisAddress = "localhost:3000"
+
+
+# TCP/IP port number the proxy listens on
+proxyPort = 1000
+
+# Cache expiry time (in ms)
+cacheExpiry = 5000
+
+# Capacity (number of keys)
+cacheCapacity = 10
