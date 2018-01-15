@@ -1,2 +1,2 @@
 # simple-cache-server
-a simple cache server in Go, using Redis for caching
+a simple cache server in Go, for caching Redis key values
