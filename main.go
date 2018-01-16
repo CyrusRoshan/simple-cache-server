@@ -21,10 +21,10 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(conf)
+	fmt.Println("Config read", *conf)
 
-	// start redis with config info
-	// log redis running on info
+	// connect to redis
+	// log success
 
 	// start proxy with config info
 	// log proxy running on info

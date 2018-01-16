@@ -1,11 +1,15 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/BurntSushi/toml"
 )
+
+var ErrMissingConfigField = errors.New("missing config field")
 
 // Config info for Proxy and Redis
 type Config struct {
@@ -18,13 +22,26 @@ type Config struct {
 // LoadConfig loads config from file and ENV, ENV taking precedence
 func LoadConfig(configFile string) (conf *Config, err error) {
 	var config Config
-	_, err = toml.DecodeFile(configFile, &config)
-	if err != nil {
-		return
+
+	if _, fileErr := os.Stat(configFile); fileErr == nil {
+		_, err = toml.DecodeFile(configFile, &config)
+		if err != nil {
+			return
+		}
 	}
 
 	err = prioritizeEnvConfig(&config)
 	if err != nil {
+		return
+	}
+
+	if config.RedisAddress == "" ||
+		config.ProxyPort == 0 ||
+		config.CacheExpiry == 0 ||
+		config.CacheCapacity == 0 {
+
+		err = ErrMissingConfigField
+		fmt.Println("test")
 		return
 	}
 
