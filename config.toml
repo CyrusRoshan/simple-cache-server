@@ -1,9 +1,9 @@
 # Address of the backing Redis
-redisAddress = "localhost:3000"
+redisAddress = "localhost:6379"
 
 
 # TCP/IP port number the proxy listens on
-proxyPort = 1000
+proxyPort = 9000
 
 # Cache expiry time (in ms)
 cacheExpiry = 5000
