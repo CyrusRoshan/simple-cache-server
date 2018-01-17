@@ -18,8 +18,7 @@ func main() {
 
 	// log success
 	redisClient, pong := connectRedis(conf.RedisAddress)
-	fmt.Println("Successfully connected to redis, with a ping for a", pong)
-	fmt.Println(redisClient)
+	fmt.Println("Successfully connected to redis, with a ping for a", pong, "| Client:", redisClient)
 	fmt.Println()
 
 	// start proxy with config info
