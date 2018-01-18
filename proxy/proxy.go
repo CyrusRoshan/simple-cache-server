@@ -9,21 +9,29 @@ import (
 )
 
 const IMPROPERLY_ENCODED_PATH = "Error - improperly urlencoded url path"
+const KEY_EMPTY = "Error - key must not be empty"
 const KEY_NOT_FOUND = "Error - key not found"
 
 func RedisProxyHandler(redisClient *redis.Client, lru *cache.LRU) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key, err := url.QueryUnescape(r.URL.Path)
+		path, err := url.QueryUnescape(r.URL.Path)
 		if err != nil {
 			w.WriteHeader(400)
 			w.Write([]byte(IMPROPERLY_ENCODED_PATH))
 			return
 		}
 
+		if len(path) <= 1 {
+			w.WriteHeader(400)
+			w.Write([]byte(KEY_EMPTY))
+			return
+		}
+
+		key := path[1:]
+
 		cachedVal := lru.Get(key)
 		if cachedVal != nil {
 			result, err := cachedVal.Result()
-
 			if errIf(err, &w, r) {
 				return
 			}
@@ -34,7 +42,6 @@ func RedisProxyHandler(redisClient *redis.Client, lru *cache.LRU) func(http.Resp
 		}
 
 		updatedValue := redisClient.Get(key)
-
 		result, err := updatedValue.Result()
 		if err == redis.Nil {
 			w.WriteHeader(404)
