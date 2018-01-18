@@ -175,7 +175,46 @@ func TestProxyCacheUpdate(t *testing.T) {
 }
 
 func TestConcurrentClients(t *testing.T) {
+	cmd := redisClient.FlushAll()
+	err := cmd.Err()
+	if err != nil {
+		t.Error(err)
+	}
 
+	redisClient.Set("KEY1", "VAL1", time.Hour)
+	redisClient.Set("KEY2", "VAL2", time.Hour)
+	redisClient.Set("KEY3", "VAL3", time.Hour)
+	redisClient.Set("KEY4", "VAL4", time.Hour)
+	redisClient.Set("KEY5", "VAL5", time.Hour)
+
+	resp1, _ := http.Get(basePath + "KEY1")
+	resp2, _ := http.Get(basePath + "KEY2")
+	resp3, _ := http.Get(basePath + "KEY3")
+	resp4, _ := http.Get(basePath + "KEY4")
+	resp5, _ := http.Get(basePath + "KEY5")
+
+	defer func() {
+		resp1.Body.Close()
+		resp2.Body.Close()
+		resp3.Body.Close()
+		resp4.Body.Close()
+		resp5.Body.Close()
+	}()
+
+	bodyByte1, _ := ioutil.ReadAll(resp1.Body)
+	bodyByte2, _ := ioutil.ReadAll(resp2.Body)
+	bodyByte3, _ := ioutil.ReadAll(resp3.Body)
+	bodyByte4, _ := ioutil.ReadAll(resp4.Body)
+	bodyByte5, _ := ioutil.ReadAll(resp5.Body)
+
+	if string(bodyByte1) != "VAL1" ||
+		string(bodyByte2) != "VAL2" ||
+		string(bodyByte3) != "VAL3" ||
+		string(bodyByte4) != "VAL4" ||
+		string(bodyByte5) != "VAL5" {
+
+		t.Error("Value mismatch")
+	}
 }
 
 func TestAsyncClients(t *testing.T) {
