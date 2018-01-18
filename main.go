@@ -29,7 +29,7 @@ func main() {
 		panic(err)
 	}
 
-	http.HandleFunc("/", proxy.RedisProxyHandler(lru))
+	http.HandleFunc("/", proxy.RedisProxyHandler(redisClient, lru))
 	portString := fmt.Sprintf(":%v", conf.ProxyPort)
 	fmt.Println("Server running on port", conf.ProxyPort)
 	log.Fatal(http.ListenAndServe(portString, nil))
