@@ -2,11 +2,15 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 
 	"github.com/go-redis/redis"
 
+	"github.com/CyrusRoshan/simple-cache-server/cache"
 	"github.com/CyrusRoshan/simple-cache-server/config"
+	"github.com/CyrusRoshan/simple-cache-server/proxy"
 )
 
 const CONFIGFILE = "config.toml"
@@ -16,13 +20,19 @@ func main() {
 	fmt.Println("Config read", *conf)
 	fmt.Println()
 
-	// log success
 	redisClient, pong := connectRedis(conf.RedisAddress)
 	fmt.Println("Successfully connected to redis, with a ping for a", pong, "| Client:", redisClient)
 	fmt.Println()
 
-	// start proxy with config info
-	// log proxy running on info
+	lru, err := cache.NewLRU(conf.CacheExpiry, conf.CacheCapacity)
+	if err != nil {
+		panic(err)
+	}
+
+	http.HandleFunc("/", proxy.RedisProxyHandler(lru))
+	portString := fmt.Sprintf(":%v", conf.ProxyPort)
+	fmt.Println("Server running on port", conf.ProxyPort)
+	log.Fatal(http.ListenAndServe(portString, nil))
 }
 
 func getConfig() *config.Config {
