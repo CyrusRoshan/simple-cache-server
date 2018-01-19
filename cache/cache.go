@@ -3,6 +3,7 @@ package cache
 import (
 	"container/list"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -21,6 +22,7 @@ type LRU struct {
 	expiry   time.Duration
 	list     *list.List
 	lookup   map[string]*list.Element
+	mutex    *sync.Mutex
 }
 
 func NewLRU(expiry int, capacity int) (lru *LRU, err error) {
@@ -33,6 +35,7 @@ func NewLRU(expiry int, capacity int) (lru *LRU, err error) {
 		expiry:   time.Duration(expiry) * time.Millisecond,
 		lookup:   make(map[string]*list.Element, capacity),
 		list:     list.New(),
+		mutex:    &sync.Mutex{},
 	}
 
 	for i := 0; i < capacity; i++ {
@@ -43,6 +46,9 @@ func NewLRU(expiry int, capacity int) (lru *LRU, err error) {
 }
 
 func (lru *LRU) Set(key string, value *redis.StringCmd) {
+	lru.mutex.Lock()
+	defer lru.mutex.Unlock()
+
 	cacheElement := element{
 		Timestamp: time.Now(),
 		Key:       key,
@@ -64,15 +70,24 @@ func (lru *LRU) Set(key string, value *redis.StringCmd) {
 	return
 }
 
+func (lru *LRU) Clear() {
+	lru.mutex.Lock()
+	lru.lookup = make(map[string]*list.Element, lru.capacity)
+	lru.mutex.Unlock()
+}
+
 func (lru *LRU) Get(key string) (response *redis.StringCmd) {
+	lru.mutex.Lock()
+	defer lru.mutex.Unlock()
+
 	listElement, exists := lru.lookup[key]
 	if !exists {
 		return nil
 	}
 
 	cacheElement := listElement.Value.(*element)
-
 	expiryTime := cacheElement.Timestamp.Add(lru.expiry)
+
 	if time.Now().Before(expiryTime) {
 		cacheElement.Timestamp = time.Now()
 		lru.list.MoveToFront(listElement)
@@ -81,7 +96,8 @@ func (lru *LRU) Get(key string) (response *redis.StringCmd) {
 	}
 
 	delete(lru.lookup, cacheElement.Key)
-	// don't delete listElement from list, we're preserving list size
+	// We don't also delete listElement from list: we're preserving list size
+
 	return nil
 }
 
