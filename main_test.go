@@ -205,10 +205,6 @@ func TestConcurrentClients(t *testing.T) {
 	wg.Wait()
 }
 
-func TestAsyncClients(t *testing.T) {
-
-}
-
 // utility functions
 func requestBody(path string) (body string, err error) {
 	resp, err := http.Get(basePath + path)
