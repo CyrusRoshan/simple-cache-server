@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,24 +20,10 @@ import (
 var redisClient *redis.Client
 var conf *config.Config
 var basePath string
+var lru *cache.LRU
 
-func requestBody(path string) (body string, err error) {
-	resp, err := http.Get(basePath + path)
-	if err != nil {
-		return "", err
-	}
-
-	defer resp.Body.Close()
-	bodyByte, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return string(bodyByte), nil
-}
-
-func TestSetup(t *testing.T) {
-	os.Setenv("CACHEEXPIRY", "100")
+func TestProxyStartup(t *testing.T) {
+	os.Setenv("CACHEEXPIRY", "50")
 	os.Setenv("CACHECAPACITY", "5")
 
 	conf = getConfig()
@@ -47,7 +35,8 @@ func TestSetup(t *testing.T) {
 		t.Error("No pong")
 	}
 
-	lru, err := cache.NewLRU(conf.CacheExpiry, conf.CacheCapacity)
+	var err error
+	lru, err = cache.NewLRU(conf.CacheExpiry, conf.CacheCapacity)
 	if err != nil {
 		t.Error(err)
 	}
@@ -58,6 +47,8 @@ func TestSetup(t *testing.T) {
 }
 
 func TestRedisKeys(t *testing.T) {
+	testSetup(t)
+
 	redisClient.Set("KEY1", "VAL1", time.Hour)
 	redisClient.Set("KEY2", "VAL2", time.Hour)
 	redisClient.Set("KEY3", "VAL3", time.Hour)
@@ -79,11 +70,7 @@ func TestRedisKeys(t *testing.T) {
 }
 
 func TestProxy404(t *testing.T) {
-	cmd := redisClient.FlushAll()
-	err := cmd.Err()
-	if err != nil {
-		t.Error(err)
-	}
+	testSetup(t)
 
 	resp, err := http.Get(basePath + "undefined")
 	if err != nil {
@@ -97,6 +84,8 @@ func TestProxy404(t *testing.T) {
 }
 
 func TestProxyIncorrectURLEncode(t *testing.T) {
+	testSetup(t)
+
 	url := basePath + "t%2%-%%%est"
 
 	// https://superuser.com/a/442395
@@ -114,11 +103,7 @@ func TestProxyIncorrectURLEncode(t *testing.T) {
 }
 
 func TestProxyCache(t *testing.T) {
-	cmd := redisClient.FlushAll()
-	err := cmd.Err()
-	if err != nil {
-		t.Error(err)
-	}
+	testSetup(t)
 
 	redisClient.Set("KEY1", "VAL1", time.Hour)
 	redisClient.Set("KEY2", "VAL2", time.Hour)
@@ -144,11 +129,7 @@ func TestProxyCache(t *testing.T) {
 }
 
 func TestProxyCacheUpdate(t *testing.T) {
-	cmd := redisClient.FlushAll()
-	err := cmd.Err()
-	if err != nil {
-		t.Error(err)
-	}
+	testSetup(t)
 
 	redisClient.Set("KEY1", "VAL1", time.Hour)
 	redisClient.Set("KEY2", "VAL2", time.Hour)
@@ -163,7 +144,7 @@ func TestProxyCacheUpdate(t *testing.T) {
 	}
 
 	redisClient.Set("KEY1", "VAL4", time.Hour)
-	time.Sleep(time.Duration(100) * time.Millisecond) // time out cache
+	time.Sleep(time.Duration(50) * time.Millisecond) // time out cache
 
 	body, err = requestBody("KEY1")
 	if err != nil {
@@ -175,48 +156,81 @@ func TestProxyCacheUpdate(t *testing.T) {
 }
 
 func TestConcurrentClients(t *testing.T) {
+	testSetup(t)
+
+	pairs := map[string]string{
+		"KEY1": "VAL1",
+		"KEY2": "VAL2",
+		"KEY3": "VAL3",
+		"KEY4": "VAL4",
+		"KEY5": "VAL5",
+	}
+
+	for key, val := range pairs {
+		redisClient.Set(key, val, time.Hour)
+	}
+
+	var wg sync.WaitGroup
+	testRequest := func(key string, val string, sleepTime int) {
+		defer wg.Done()
+		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+
+		resp, err := http.Get(basePath + key)
+		if err != nil {
+			t.Error(err)
+		}
+
+		bodyByte, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = resp.Body.Close()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if string(bodyByte) != val {
+			t.Error("Value mismatch", bodyByte, val)
+		}
+	}
+
+	for i := 0; i < 1000; i++ {
+		for key, val := range pairs {
+			wg.Add(1)
+			go testRequest(key, val, rand.Intn(10))
+		}
+	}
+
+	wg.Wait()
+}
+
+func TestAsyncClients(t *testing.T) {
+
+}
+
+// utility functions
+func requestBody(path string) (body string, err error) {
+	resp, err := http.Get(basePath + path)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	bodyByte, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(bodyByte), nil
+}
+
+func testSetup(t *testing.T) {
+	lru.Clear()
+
 	cmd := redisClient.FlushAll()
 	err := cmd.Err()
 	if err != nil {
 		t.Error(err)
 	}
-
-	redisClient.Set("KEY1", "VAL1", time.Hour)
-	redisClient.Set("KEY2", "VAL2", time.Hour)
-	redisClient.Set("KEY3", "VAL3", time.Hour)
-	redisClient.Set("KEY4", "VAL4", time.Hour)
-	redisClient.Set("KEY5", "VAL5", time.Hour)
-
-	resp1, _ := http.Get(basePath + "KEY1")
-	resp2, _ := http.Get(basePath + "KEY2")
-	resp3, _ := http.Get(basePath + "KEY3")
-	resp4, _ := http.Get(basePath + "KEY4")
-	resp5, _ := http.Get(basePath + "KEY5")
-
-	defer func() {
-		resp1.Body.Close()
-		resp2.Body.Close()
-		resp3.Body.Close()
-		resp4.Body.Close()
-		resp5.Body.Close()
-	}()
-
-	bodyByte1, _ := ioutil.ReadAll(resp1.Body)
-	bodyByte2, _ := ioutil.ReadAll(resp2.Body)
-	bodyByte3, _ := ioutil.ReadAll(resp3.Body)
-	bodyByte4, _ := ioutil.ReadAll(resp4.Body)
-	bodyByte5, _ := ioutil.ReadAll(resp5.Body)
-
-	if string(bodyByte1) != "VAL1" ||
-		string(bodyByte2) != "VAL2" ||
-		string(bodyByte3) != "VAL3" ||
-		string(bodyByte4) != "VAL4" ||
-		string(bodyByte5) != "VAL5" {
-
-		t.Error("Value mismatch")
-	}
-}
-
-func TestAsyncClients(t *testing.T) {
-
 }
