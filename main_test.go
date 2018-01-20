@@ -195,7 +195,7 @@ func TestConcurrentClients(t *testing.T) {
 		}
 	}
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 100; i++ {
 		for key, val := range pairs {
 			wg.Add(1)
 			go testRequest(key, val, rand.Intn(10))

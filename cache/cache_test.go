@@ -73,6 +73,37 @@ func TestOverflowCapacity(t *testing.T) {
 	}
 }
 
+func TestCacheCycling(t *testing.T) {
+	lru, err := NewLRU(1000, 3)
+	if err != nil {
+		panic(err)
+	}
+
+	a := redis.StringCmd{}
+	b := redis.StringCmd{}
+	c := redis.StringCmd{}
+	d := redis.StringCmd{}
+	e := redis.StringCmd{}
+	f := redis.StringCmd{}
+
+	lru.Set("a", &a)
+	lru.Set("b", &b)
+	lru.Set("c", &c)
+	lru.Set("d", &d)
+	lru.Set("e", &e)
+	lru.Set("f", &f)
+
+	if lru.Get("a") != nil ||
+		lru.Get("b") != nil ||
+		lru.Get("c") != nil ||
+		lru.Get("d") != &d ||
+		lru.Get("e") != &e ||
+		lru.Get("f") != &f {
+
+		t.Fail()
+	}
+}
+
 func TestReassignment(t *testing.T) {
 	lru, err := NewLRU(1000, 5)
 	if err != nil {
@@ -132,7 +163,7 @@ func TestCacheTimeout(t *testing.T) {
 		t.Fail()
 	}
 
-	// b should have expired, c shouldn't have, and should be refreshed
+	// b should have expired, c shouldn't have
 	time.Sleep(50 * time.Millisecond)
 	if lru.Get("b") != nil ||
 		lru.Get("c") != &c {
@@ -140,9 +171,9 @@ func TestCacheTimeout(t *testing.T) {
 		t.Fail()
 	}
 
-	// c shouldn't have expired
+	// c should have expired
 	time.Sleep(10 * time.Millisecond)
-	if lru.Get("c") != &c {
+	if lru.Get("c") != nil {
 
 		t.Fail()
 	}
