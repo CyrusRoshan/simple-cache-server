@@ -93,10 +93,15 @@ func TestCacheCycling(t *testing.T) {
 	lru.Set("e", &e)
 	lru.Set("f", &f)
 
-	if lru.Get("a") != nil ||
+	lru.Set("a", &a)
+
+	if lru.Get("a") != &a ||
+		lru.Get("b") != nil ||
 		lru.Get("b") != nil ||
 		lru.Get("c") != nil ||
-		lru.Get("d") != &d ||
+		lru.Get("d") != nil ||
+		lru.Get("e") != &e ||
+		lru.Get("e") != &e ||
 		lru.Get("e") != &e ||
 		lru.Get("f") != &f {
 

@@ -42,6 +42,21 @@ When recieving a request, the proxy first checks for the key value in the LRU. I
 
 If the client's request is in the LRU, it's of course served back, and the key's position in the cache is moved to the start.
 
+## Algorithmic complexity for LRU operations
+
+- Set: O(1) for map access, O(1) for accessing the list element the map object points to, O(1) for either:
+    - (if list element exists) moving the list element to front
+    - (if list element doesn't exist) deleting the last element from the (doubly linked) list, deleting the corresponding map k/v pair, and pushing the new element to the front, then assigning the new elem's key to the new elem, in the map). Probably could have been written better, but assuming pointer access and map access is O(1), this is an O(1) operation.
+- Get: O(1) for map access, O(1) for accessing the list element the map object points to, O(1) for checking expiry time, and either:
+    - O(1) for moving element to front of list and returning it
+    - O(1) for deleting the element's corresponding k/v pair (if element is lazy expired) and returning nil
+- Clear: lru.list is not modified, lru.lookup points to a new map, and the old map is garbage collected. Therefore, the Big O is O(1).
+
+## How long I spent on each part:
+In total, around 6-7hrs as a liberal estimate, not including this documentation commit.
+
+I spent a while selecting the right redis library, reading a bit about how it works, looking into a good YAML alternative for simple config files (I went with TOML). Maybe an hour on config-related stuff, then a couple hours on the cache. Then 30-45m on the server part of the proxy. Then the rest of the time writing tests, adding concurrency, noticing issues with my implementation, cleaning up code, cleaning up tests, writing documentation, and recovering from cache misses inbetween putting down and picking up work.
+
 # What's done:
 
 ## Required: 
@@ -58,7 +73,7 @@ If the client's request is in the LRU, it's of course served back, and the key's
 - [x] Documentation
 
 ## Optional
-- [ ] Platform (Dockerizing proxy) (In progress)
+- [ ] Platform (Dockerizing proxy) (Planned)
 - [x] Parallel concurrent processing 
 - [ ] Redis client protocol (not planned, but there's always [this](https://github.com/quorzz/redis-protocol), I guess)
 
