@@ -89,7 +89,6 @@ func (lru *LRU) Get(key string) (response *redis.StringCmd) {
 	expiryTime := cacheElement.Timestamp.Add(lru.expiry)
 
 	if time.Now().Before(expiryTime) {
-		cacheElement.Timestamp = time.Now()
 		lru.list.MoveToFront(listElement)
 
 		return cacheElement.Response
