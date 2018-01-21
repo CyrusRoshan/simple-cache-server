@@ -1,0 +1,20 @@
+version: '3'
+services:
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+
+  web:
+    build: .
+    image: simple-cache-server
+    ports:
+      - "9000:9000"
+    depends_on:
+      - redis
+    environment:
+      - REDISADDRESS=${REDISADDRESS}
+      - CONFIGFILE=${CONFIGFILE}
+      - PROXYPORT=${PROXYPORT}
+      - CACHEEXPIRY=${CACHEEXPIRY}
+      - CACHECAPACITY=${CACHECAPACITY}

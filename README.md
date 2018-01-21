@@ -2,10 +2,19 @@
 a simple cache server in Go, for caching Redis key values in an LRU cache
 
 ## Running:
-- `docker run -d -p 6379:6379 redis`
+
+Dockerized:
+
+- `docker-compose up`
+
+OR (undockerized):
+
+- `redis-server`
 - `go run main.go`
 
-This also supports the following environment variables:
+Use `redis-cli` with either setup to `SET` key values on the Redis instance.
+
+Both setups support the following environment variables (if you use `docker-compose`, ignore `config.toml`, and just modify `.env` to change value defaults):
 - `CONFIGFILE`: Config file location. See `config.toml` for an example. Config settings are overridden by env var settings
 - `REDISADDRESS`: Redis server address, including port
 - `PROXYPORT`: Port to bind the proxy server to
@@ -73,7 +82,7 @@ I spent a while selecting the right redis library, reading a bit about how it wo
 - [x] Documentation
 
 ## Optional
-- [ ] Platform (Dockerizing proxy) (Planned)
+- [x] Platform (Dockerizing proxy)
 - [x] Parallel concurrent processing 
 - [ ] Redis client protocol (not planned, but there's always [this](https://github.com/quorzz/redis-protocol), I guess)
 
